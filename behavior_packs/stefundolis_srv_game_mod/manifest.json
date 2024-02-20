@@ -1,10 +1,10 @@
 {
   "format_version": 2,
   "header": {
-    "name": "StefUNDOlis Server Game Mod 0.0.1",
+    "name": "StefUNDOlis Server Game Mod 0.0.2",
     "description": "Adds a custom minigame",
     "uuid": "5344fa8e-c4c8-458c-bd93-6862644d59a9",
-    "version": [0, 0, 1],
+    "version": [0, 0, 2],
     "min_engine_version": [1, 20, 30]
   },
   "modules": [
@@ -13,7 +13,7 @@
       "language": "javascript",
       "type": "script",
       "uuid": "df6ea2b4-a5df-4c24-a5e2-e3d8a5551497",
-      "version": [0, 0, 1],
+      "version": [0, 0, 2],
       "entry": "scripts/main.js"
     }
   ],
