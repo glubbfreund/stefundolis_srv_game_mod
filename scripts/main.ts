@@ -1,19 +1,96 @@
-import { Vector3, world, TargetBlockHitAfterEvent } from "@minecraft/server";
+import {
+  Vector3,
+  world,
+  TargetBlockHitAfterEvent,
+  EntityHitBlockAfterEvent,
+  Player,
+  DisplaySlotId,
+  ScoreboardObjective,
+  ObjectiveSortOrder,
+} from "@minecraft/server";
+
+let match = false;
+let roundPoints = 0;
+let roundCounter = 1;
+let matchPlayers: Player[] = [];
+
+function float2int(value: number) {
+  return value | 0;
+}
+
+function sendTitleToPlayer(player: Player, titleMsg: string, subtitleMsg: string) {
+  player.onScreenDisplay.setTitle(titleMsg, {
+    stayDuration: 5,
+    fadeInDuration: 50,
+    fadeOutDuration: 50,
+    subtitle: subtitleMsg,
+  });
+}
+
+function initMatch() {
+  match = true;
+
+  let scoreObjective = world.scoreboard.getObjective("dartgame");
+  if (!scoreObjective) {
+    scoreObjective = world.scoreboard.addObjective("dartgame", "Dart Match");
+  }
+  scoreObjective.addScore("Aktueller Wurf", roundPoints);
+  scoreObjective.addScore("Aktuelle Runde", roundCounter);
+  world.scoreboard.setObjectiveAtDisplaySlot(DisplaySlotId.Sidebar, {
+    objective: scoreObjective,
+    sortOrder: ObjectiveSortOrder.Ascending,
+  });
+  matchPlayers.forEach((player) => {
+    player.runCommand("scoreboard players set @s dartgame 101");
+  });
+}
+
+function unloadMatch() {
+  match = false;
+  world.scoreboard.removeObjective("dartgame");
+}
+
+function entityHitBlockHandler(e: EntityHitBlockAfterEvent) {
+  if (!e.hitBlock.permutation.matches("minecraft:target") || e.damagingEntity.typeId != "minecraft:player") return;
+
+  let initiatedPlayer = e.damagingEntity as Player;
+  matchPlayers = e.hitBlock.dimension.getPlayers({
+    location: initiatedPlayer.location,
+    closest: 3,
+    maxDistance: 10,
+  });
+
+  let matchPlayersString = "";
+  let counter = 0;
+  matchPlayers.forEach((player) => {
+    if (counter != 0) matchPlayersString += " vs ";
+    matchPlayersString += player.nameTag;
+    counter++;
+  });
+
+  if (!match) {
+    sendTitleToPlayer(e.damagingEntity as Player, "§2Match gestartet", matchPlayersString);
+    initMatch();
+  } else {
+    sendTitleToPlayer(e.damagingEntity as Player, "§4Match abgebrochen", "");
+    unloadMatch();
+  }
+}
 
 function targetBlockHandler(e: TargetBlockHitAfterEvent) {
   let ppos: Vector3 = { x: 0, y: 0, z: 0 };
   switch (e.source.getBlockFromViewDirection()?.face.toString()) {
     case "North":
-      ppos = { x: e.block.x, y: e.block.y - 1, z: e.block.z - 15 };
+      ppos = { x: e.block.x, y: e.block.y - 1, z: e.block.z - 14 };
       break;
     case "South":
-      ppos = { x: e.block.x, y: e.block.y - 1, z: e.block.z + 15 };
+      ppos = { x: e.block.x, y: e.block.y - 1, z: e.block.z + 14 };
       break;
     case "West":
-      ppos = { x: e.block.x - 15, y: e.block.y - 1, z: e.block.z };
+      ppos = { x: e.block.x - 14, y: e.block.y - 1, z: e.block.z };
       break;
     case "East":
-      ppos = { x: e.block.x + 15, y: e.block.y - 1, z: e.block.z };
+      ppos = { x: e.block.x + 14, y: e.block.y - 1, z: e.block.z };
       break;
   }
   let players = e.dimension.getPlayers({
@@ -21,7 +98,53 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
     closest: 1,
     maxDistance: 1,
   });
-  world.sendMessage("§7" + players[0].nameTag + " hat " + e.redstonePower.toString() + " Punkte erzielt.");
+
+  let player0Identity = players[0].scoreboardIdentity;
+  if (!player0Identity) return;
+
+  let scoredPoint = float2int(e.redstonePower / 2);
+  players[0].sendMessage("§7Du wirfst " + scoredPoint.toString() + " Punkte.");
+  if (!match) return;
+
+  let gameObjective = world.scoreboard.getObjective("dartgame");
+  let currentScore = gameObjective?.getScore(player0Identity);
+
+  if (!currentScore) return;
+  roundPoints += scoredPoint;
+
+  if (currentScore - roundPoints < 0) {
+    matchPlayers.forEach((player) => {
+      sendTitleToPlayer(
+        player,
+        "§7überworfen!",
+        "§7" + player0Identity?.displayName + " wirft §4" + roundPoints.toString() + "§7 Punkte in dieser Runde"
+      );
+    });
+    roundCounter = 1;
+    roundPoints = 0;
+  } else if (currentScore - roundPoints == 0) {
+    matchPlayers.forEach((player) => {
+      sendTitleToPlayer(player, "§2Match beendet", "§2" + player0Identity?.displayName + " §7hat das Match gewonnen!");
+    });
+    unloadMatch();
+    return;
+  } else if (roundCounter == 3) {
+    gameObjective?.setScore(player0Identity, currentScore - roundPoints);
+    matchPlayers.forEach((player) => {
+      sendTitleToPlayer(
+        player,
+        "§7Nächster Spieler!",
+        player0Identity?.displayName + " wirft §2" + roundPoints.toString() + "§7 Punkte in dieser Runde"
+      );
+    });
+    roundPoints = 0;
+    roundCounter = 1;
+  } else {
+    roundCounter++;
+  }
+  gameObjective?.setScore("Aktuelle Runde", roundCounter);
+  gameObjective?.setScore("Aktueller Wurf", roundPoints);
 }
 
 world.afterEvents.targetBlockHit.subscribe(targetBlockHandler);
+world.afterEvents.entityHitBlock.subscribe(entityHitBlockHandler);
