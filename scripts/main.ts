@@ -138,6 +138,11 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
       world.playSound("random.levelup", e.block.location);
       sendTitleToPlayer(player, "§2Match beendet", "§2" + player0Identity?.displayName + " §7hat das Match gewonnen!");
     });
+    matchPlayers.forEach((player) => {
+      let xp =
+        matchPlayers.length > 1 && player.scoreboardIdentity?.displayName === player0Identity?.displayName ? 400 : 200;
+      player.runCommand("xp " + xp + " @s");
+    });
     unloadMatch();
     return;
   } else if (roundCounter == 3) {
