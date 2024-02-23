@@ -36,8 +36,6 @@ function initMatch() {
   if (!scoreObjective) {
     scoreObjective = world.scoreboard.addObjective("dartgame", "Dart Match");
   }
-  scoreObjective.addScore("Letzter Wurf", lastPoints);
-  scoreObjective.addScore("Aktuelle Runde", roundCounter);
   world.scoreboard.setObjectiveAtDisplaySlot(DisplaySlotId.Sidebar, {
     objective: scoreObjective,
     sortOrder: ObjectiveSortOrder.Ascending,
@@ -62,10 +60,10 @@ function entityHitBlockHandler(e: EntityHitBlockAfterEvent) {
   matchPlayers = e.hitBlock.dimension.getPlayers({
     location: initiatedPlayer.location,
     closest: 3,
-    maxDistance: 10,
+    maxDistance: 20,
   });
 
-  let matchPlayersString = "";
+  let matchPlayersString = "§r";
   let counter = 0;
   matchPlayers.forEach((player) => {
     if (counter != 0) matchPlayersString += "§o vs §r";
@@ -109,7 +107,11 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
 
   let scoredPoint = float2int(e.redstonePower / 2);
   lastPoints = scoredPoint;
-  players[0].sendMessage("§7Du wirfst " + scoredPoint.toString() + " Punkte.");
+
+  matchPlayers.forEach((player) => {
+    player.sendMessage("§7" + player0Identity?.displayName + " wirft " + scoredPoint.toString() + " Punkte.");
+  });
+
   if (!match) return;
 
   let gameObjective = world.scoreboard.getObjective("dartgame");
@@ -133,16 +135,23 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
     roundPoints = 0;
   } else if (currentScore - scoredPoint == 0) {
     matchPlayers.forEach((player) => {
+      world.playSound("random.levelup", e.block.location);
       sendTitleToPlayer(player, "§2Match beendet", "§2" + player0Identity?.displayName + " §7hat das Match gewonnen!");
     });
     unloadMatch();
     return;
   } else if (roundCounter == 3) {
+    let color = "§2";
+    if (roundPoints === 21) {
+      color = "§r";
+      world.playSound("block.bell.hit", e.block.location);
+      world.playSound("ambient.weather.thunder", e.block.location);
+    }
     matchPlayers.forEach((player) => {
       sendTitleToPlayer(
         player,
         "§7Nächster Spieler!",
-        player0Identity?.displayName + " wirft §2" + roundPoints.toString() + "§7 Punkte in dieser Runde"
+        "§7" + player0Identity?.displayName + " wirft §2" + roundPoints.toString() + "§7 Punkte in dieser Runde"
       );
     });
     roundPoints = 0;
@@ -150,8 +159,6 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
   } else {
     roundCounter++;
   }
-  gameObjective?.setScore("Aktuelle Runde", roundCounter);
-  gameObjective?.setScore("Letzter Wurf", lastPoints);
 }
 
 world.afterEvents.targetBlockHit.subscribe(targetBlockHandler);
