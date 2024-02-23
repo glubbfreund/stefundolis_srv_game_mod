@@ -11,6 +11,8 @@ import {
 
 let match = false;
 let roundPoints = 0;
+let lastPoints = 0;
+let prevPoints = 0;
 let roundCounter = 1;
 let matchPlayers: Player[] = [];
 
@@ -34,7 +36,7 @@ function initMatch() {
   if (!scoreObjective) {
     scoreObjective = world.scoreboard.addObjective("dartgame", "Dart Match");
   }
-  scoreObjective.addScore("Aktueller Wurf", roundPoints);
+  scoreObjective.addScore("Letzter Wurf", lastPoints);
   scoreObjective.addScore("Aktuelle Runde", roundCounter);
   world.scoreboard.setObjectiveAtDisplaySlot(DisplaySlotId.Sidebar, {
     objective: scoreObjective,
@@ -46,6 +48,9 @@ function initMatch() {
 }
 
 function unloadMatch() {
+  roundCounter = 1;
+  roundPoints = 0;
+  lastPoints = 0;
   match = false;
   world.scoreboard.removeObjective("dartgame");
 }
@@ -63,7 +68,7 @@ function entityHitBlockHandler(e: EntityHitBlockAfterEvent) {
   let matchPlayersString = "";
   let counter = 0;
   matchPlayers.forEach((player) => {
-    if (counter != 0) matchPlayersString += " vs ";
+    if (counter != 0) matchPlayersString += "§o vs §r";
     matchPlayersString += player.nameTag;
     counter++;
   });
@@ -103,6 +108,7 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
   if (!player0Identity) return;
 
   let scoredPoint = float2int(e.redstonePower / 2);
+  lastPoints = scoredPoint;
   players[0].sendMessage("§7Du wirfst " + scoredPoint.toString() + " Punkte.");
   if (!match) return;
 
@@ -110,9 +116,11 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
   let currentScore = gameObjective?.getScore(player0Identity);
 
   if (!currentScore) return;
+  if (roundCounter === 1) prevPoints = currentScore;
   roundPoints += scoredPoint;
+  gameObjective?.setScore(player0Identity, currentScore - scoredPoint);
 
-  if (currentScore - roundPoints < 0) {
+  if (currentScore - scoredPoint < 0) {
     matchPlayers.forEach((player) => {
       sendTitleToPlayer(
         player,
@@ -120,16 +128,16 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
         "§7" + player0Identity?.displayName + " wirft §4" + roundPoints.toString() + "§7 Punkte in dieser Runde"
       );
     });
+    gameObjective?.setScore(player0Identity, prevPoints);
     roundCounter = 1;
     roundPoints = 0;
-  } else if (currentScore - roundPoints == 0) {
+  } else if (currentScore - scoredPoint == 0) {
     matchPlayers.forEach((player) => {
       sendTitleToPlayer(player, "§2Match beendet", "§2" + player0Identity?.displayName + " §7hat das Match gewonnen!");
     });
     unloadMatch();
     return;
   } else if (roundCounter == 3) {
-    gameObjective?.setScore(player0Identity, currentScore - roundPoints);
     matchPlayers.forEach((player) => {
       sendTitleToPlayer(
         player,
@@ -143,7 +151,7 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
     roundCounter++;
   }
   gameObjective?.setScore("Aktuelle Runde", roundCounter);
-  gameObjective?.setScore("Aktueller Wurf", roundPoints);
+  gameObjective?.setScore("Letzter Wurf", lastPoints);
 }
 
 world.afterEvents.targetBlockHit.subscribe(targetBlockHandler);
