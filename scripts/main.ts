@@ -140,8 +140,8 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
     });
     matchPlayers.forEach((player) => {
       let xp =
-        matchPlayers.length > 1 && player.scoreboardIdentity?.displayName === player0Identity?.displayName ? 400 : 200;
-      player.runCommand("xp " + xp + " @s");
+        matchPlayers.length > 1 && player.scoreboardIdentity?.displayName === player0Identity?.displayName ? 3 : 1;
+      player.runCommand("xp " + xp + "L @s");
     });
     unloadMatch();
     return;
