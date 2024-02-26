@@ -5,8 +5,8 @@ import {
   EntityHitBlockAfterEvent,
   Player,
   DisplaySlotId,
-  ScoreboardObjective,
   ObjectiveSortOrder,
+  ScoreboardIdentity,
 } from "@minecraft/server";
 
 let match = false;
@@ -15,6 +15,7 @@ let lastPoints = 0;
 let prevPoints = 0;
 let roundCounter = 1;
 let matchPlayers: Player[] = [];
+let player0Identity: ScoreboardIdentity | undefined;
 
 function float2int(value: number) {
   return value | 0;
@@ -80,8 +81,28 @@ function entityHitBlockHandler(e: EntityHitBlockAfterEvent) {
   }
 }
 
-function targetBlockHandler(e: TargetBlockHitAfterEvent) {
+function sendMessageToMatchPlayers(str: string) {
+  matchPlayers.forEach((player) => {
+    player.sendMessage(str);
+  });
+}
+
+function sendTitleToMatchPlayers(title: string, subtitle: string) {
+  matchPlayers.forEach((player) => {
+    sendTitleToPlayer(player, title, subtitle);
+  });
+}
+
+function increasePlayerLevel() {
+  matchPlayers.forEach((player) => {
+    let xp = matchPlayers.length > 1 && player.scoreboardIdentity?.displayName === player0Identity?.displayName ? 3 : 1;
+    player.runCommand("xp " + xp + "L @s");
+  });
+}
+
+function getPlayerPositionFromViewDirection(e: TargetBlockHitAfterEvent) {
   let ppos: Vector3 = { x: 0, y: 0, z: 0 };
+
   switch (e.source.getBlockFromViewDirection()?.face.toString()) {
     case "North":
       ppos = { x: e.block.x, y: e.block.y - 1, z: e.block.z - 14 };
@@ -96,22 +117,24 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
       ppos = { x: e.block.x + 14, y: e.block.y - 1, z: e.block.z };
       break;
   }
+
+  return ppos;
+}
+
+function targetBlockHandler(e: TargetBlockHitAfterEvent) {
   let players = e.dimension.getPlayers({
-    location: ppos,
+    location: getPlayerPositionFromViewDirection(e),
     closest: 1,
     maxDistance: 1,
   });
 
-  let player0Identity = players[0].scoreboardIdentity;
+  player0Identity = players[0].scoreboardIdentity;
   if (!player0Identity) return;
 
   let scoredPoint = float2int(e.redstonePower / 2);
   lastPoints = scoredPoint;
 
-  matchPlayers.forEach((player) => {
-    player.sendMessage("§7" + player0Identity?.displayName + " wirft " + scoredPoint.toString() + " Punkte.");
-  });
-
+  sendMessageToMatchPlayers("§7" + player0Identity?.displayName + " wirft " + scoredPoint.toString() + " Punkte.");
   if (!match) return;
 
   let gameObjective = world.scoreboard.getObjective("dartgame");
@@ -123,26 +146,17 @@ function targetBlockHandler(e: TargetBlockHitAfterEvent) {
   gameObjective?.setScore(player0Identity, currentScore - scoredPoint);
 
   if (currentScore - scoredPoint < 0) {
-    matchPlayers.forEach((player) => {
-      sendTitleToPlayer(
-        player,
-        "§7überworfen!",
-        "§7" + player0Identity?.displayName + " wirft §4" + roundPoints.toString() + "§7 Punkte in dieser Runde"
-      );
-    });
+    sendTitleToMatchPlayers(
+      "§7überworfen!",
+      "§7" + player0Identity?.displayName + " wirft §4" + roundPoints.toString() + "§7 Punkte in dieser Runde"
+    );
     gameObjective?.setScore(player0Identity, prevPoints);
     roundCounter = 1;
     roundPoints = 0;
   } else if (currentScore - scoredPoint == 0) {
-    matchPlayers.forEach((player) => {
-      world.playSound("random.levelup", e.block.location);
-      sendTitleToPlayer(player, "§2Match beendet", "§2" + player0Identity?.displayName + " §7hat das Match gewonnen!");
-    });
-    matchPlayers.forEach((player) => {
-      let xp =
-        matchPlayers.length > 1 && player.scoreboardIdentity?.displayName === player0Identity?.displayName ? 3 : 1;
-      player.runCommand("xp " + xp + "L @s");
-    });
+    world.playSound("random.levelup", e.block.location);
+    sendTitleToMatchPlayers("§2Match beendet", "§2" + player0Identity?.displayName + " §7hat das Match gewonnen!");
+    increasePlayerLevel();
     unloadMatch();
     return;
   } else if (roundCounter == 3) {
