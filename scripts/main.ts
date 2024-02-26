@@ -101,24 +101,23 @@ function increasePlayerLevel() {
 }
 
 function getPlayerPositionFromViewDirection(e: TargetBlockHitAfterEvent) {
-  let ppos: Vector3 = { x: 0, y: 0, z: 0 };
-
   switch (e.source.getBlockFromViewDirection()?.face.toString()) {
     case "North":
-      ppos = { x: e.block.x, y: e.block.y - 1, z: e.block.z - 14 };
+      return { x: e.block.x, y: e.block.y - 1, z: e.block.z - 14 };
       break;
     case "South":
-      ppos = { x: e.block.x, y: e.block.y - 1, z: e.block.z + 14 };
+      return { x: e.block.x, y: e.block.y - 1, z: e.block.z + 14 };
       break;
     case "West":
-      ppos = { x: e.block.x - 14, y: e.block.y - 1, z: e.block.z };
+      return { x: e.block.x - 14, y: e.block.y - 1, z: e.block.z };
       break;
     case "East":
-      ppos = { x: e.block.x + 14, y: e.block.y - 1, z: e.block.z };
+      return { x: e.block.x + 14, y: e.block.y - 1, z: e.block.z };
+      break;
+    default:
+      return { x: 0, y: 0, z: 0 };
       break;
   }
-
-  return ppos;
 }
 
 function targetBlockHandler(e: TargetBlockHitAfterEvent) {
